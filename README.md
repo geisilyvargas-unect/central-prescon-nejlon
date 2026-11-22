@@ -21,3 +21,7 @@ GitHub → Settings → Pages → Deploy from a branch → `main` → `/(root)`.
 A integração Google exige OAuth próprio no servidor, com consentimento da conta Google; conectar o Google Drive ao ChatGPT não conecta automaticamente o site. Enquanto isso, relatórios podem ser preparados/copied no painel e arquivos existentes podem ser abertos por links do Drive.
 
 **Estado:** código do projeto separado do portal anterior; antes do uso institucional, validar a autenticação PRESCON, permissões de banco, geração de documentos e publicação do Pages.
+
+## Integração Apps Script
+
+A área [Apps Script](pages/apps-script.html) permite criar e revogar chaves de sincronização para a planilha já conhecida pelo Conselho. A rotina, executada em projeto privado na conta Google da PRESCON, atualiza somente a aba `PRESCON_AUTOMACOES`, sem enviar votos individuais ou justificativas. Para configurar, consulte [o guia completo](docs/APPS-SCRIPT.md). A criação do projeto Apps Script e o consentimento Google são ações do titular da conta; não foram automatizados pelo repositório.
