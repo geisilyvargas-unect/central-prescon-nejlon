@@ -472,7 +472,7 @@ async function createDeliberationSource(user,p){
  const pref=(await db('prescon_preferences',{query:'select=private_root_folder_id&owner_user_id=eq.'+user.id+'&limit=1'}))[0];
  if(!pref?.private_root_folder_id)bad(409,'Prepare a pasta privada no Google Workspace antes de importar a planilha.');
  await requireManagedLocation(user,pref.private_root_folder_id,token);
- const digest=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',binary)));
+ const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',binary)),b=>b.toString(16).padStart(2,'0')).join('');
  // The actual file is preserved in its original format; no parsing or scenario inference.
  const boundary='psc_'+crypto.randomUUID().replaceAll('-','');
  const meta=JSON.stringify({name:filename,mimeType:/\.ods$/i.test(filename)?'application/vnd.oasis.opendocument.spreadsheet':/\.xls$/i.test(filename)?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',parents:[pref.private_root_folder_id]});
@@ -516,6 +516,7 @@ async function finalizeDeliberation(user,p){
  const token=await googleToken(user);
  const pref=(await db('prescon_preferences',{query:'select=private_root_folder_id&owner_user_id=eq.'+user.id+'&limit=1'}))[0];
  if(!pref?.private_root_folder_id)bad(409,'Configure a pasta privada do Google Drive.');
+ if(submissions.length>=1000)bad(409,'Há pelo menos 1.000 respostas. A paginação precisa ser conferida antes de finalizar.');
  const approved=submissions.filter(x=>x.state==='accepted');
  const ejs=await db('ejs',{query:'select=id,name&limit=100'});
  const counts={};
@@ -556,6 +557,7 @@ async function finalizeDeliberation(user,p){
   'Este documento foi gerado a partir dos registros aceitos no Portal. A PRESCON é responsável pela revisão e compartilhamento institucional.'
  ];
  const title='Relatório de deliberação — '+form.title;
+ if(lines.join('\n').length>145000)bad(409,'O relatório excedeu o limite seguro de tamanho. Reduza as notas ou consolide respostas antes de gerar.');
  const doc=await google('https://www.googleapis.com/drive/v3/files?fields=id,name',token,{method:'POST',data:{name:title.slice(0,240),
   mimeType:'application/vnd.google-apps.document',parents:[pref.private_root_folder_id]}});
  await google('https://docs.googleapis.com/v1/documents/'+encodeURIComponent(doc.id)+':batchUpdate',token,{method:'POST',data:{
