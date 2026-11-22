@@ -120,7 +120,7 @@ function validarConfiguracao_(props) {
 
 function buscarResumo_(token, spreadsheetId) {
   const res = UrlFetchApp.fetch(PRESCON_ENDPOINT, {
-    method: 'get', headers: {Authorization: 'Bearer ' + token},
+    method: 'get', headers: {'X-Prescon-Sync-Token': token},
     muteHttpExceptions: true, followRedirects: false
   });
   if (res.getResponseCode() !== 200) {
