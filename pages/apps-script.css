@@ -1,0 +1,40 @@
+.apps-script-page .automation-shell{max-width:1100px}
+.apps-hero{background:#1e1c1f;border-top:5px solid #cf3039;min-height:250px}
+.apps-hero h1{font-size:clamp(32px,5vw,58px)}
+.apps-flex{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.apps-flex>div{max-width:720px}
+.apps-flex h2{margin:6px 0}
+.apps-flex p{color:var(--ux-muted,#d1d1d1);font-size:12px;line-height:1.6}
+.apps-flex button,.apps-flex a{min-height:43px;flex-shrink:0}
+.apps-login{max-width:520px}
+.apps-connect-form{display:flex;align-items:end;gap:13px;flex-wrap:wrap}
+.apps-connect-form label{flex:1 1 290px}
+.apps-connect-form button{min-height:43px}
+.apps-secret{margin-top:17px;padding:16px;background:var(--ux-raised,#333);border:1px solid var(--ux-red,#cf3039);border-left:5px solid var(--ux-red,#cf3039);border-radius:11px}
+.apps-secret p{font-size:12px;color:var(--ux-text,#fff)}
+.apps-secret-row{display:flex;gap:10px;align-items:start;flex-wrap:wrap}
+.apps-secret-row code{flex:1 1 250px;min-width:0;padding:12px;border:1px solid var(--ux-border,#505050);border-radius:9px;background:var(--ux-input,#191719);color:var(--ux-text,#fff);overflow-wrap:anywhere;font-size:11px}
+.apps-secret-row button{flex:0 0 auto}
+.apps-connections{display:grid;gap:9px}
+.apps-connection{display:flex;justify-content:space-between;align-items:flex-start;gap:13px;flex-wrap:wrap;padding:15px;background:var(--ux-raised,#2c2b2e);border:1px solid var(--ux-border,#555);border-radius:10px}
+.apps-connection>div{display:grid;gap:7px;max-width:710px}
+.apps-connection strong{color:var(--ux-text,#fff);font-size:14px}
+.apps-connection p,.apps-connection small{margin:0;color:var(--ux-muted,#ccc);font-size:11px}
+.apps-connection button{min-height:43px}
+.apps-steps{display:grid;gap:13px;padding-left:24px;margin:16px 0 19px}
+.apps-steps li{color:var(--ux-text,#fff);font-size:12px;line-height:1.65;padding-left:6px}
+.apps-steps a{color:var(--ux-text,#fff);font-weight:800;text-underline-offset:3px}
+.apps-properties{display:grid;gap:9px}
+.apps-properties>div{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:13px 15px;border:1px solid var(--ux-border,#555);border-radius:9px;background:var(--ux-raised,#313034)}
+.apps-properties strong{font-size:12px;color:var(--ux-text,#fff)}
+.apps-properties code{font-size:11px;color:var(--ux-text,#fff);overflow-wrap:anywhere}
+.apps-properties small{font-size:11px;color:var(--ux-muted,#ccc)}
+.apps-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.apps-features>div{background:var(--ux-raised,#323033);border:1px solid var(--ux-border,#555);border-top:4px solid var(--ux-petrol,#005762);border-radius:10px;padding:15px;min-width:0}
+.apps-features>div:nth-child(2){border-top-color:var(--ux-red,#ce333e)}
+.apps-features>div:nth-child(3){border-top-color:var(--ux-lime,#9bc90e)}
+.apps-features strong{font-size:13px;color:var(--ux-text,#fff)}
+.apps-features p{font-size:12px;line-height:1.6;color:var(--ux-muted,#ddd)}
+.apps-script-page [hidden]{display:none!important}
+.apps-script-page button:focus-visible,.apps-script-page a:focus-visible{outline:3px solid var(--ux-red,#ce333e);outline-offset:2px}
+@media(max-width:740px){.apps-features{grid-template-columns:1fr}.apps-connect-form{flex-direction:column;align-items:stretch}.apps-connect-form label,.apps-connect-form button{width:100%}.apps-secret-row button{width:100%}.apps-properties>div{align-items:flex-start;flex-direction:column}}
