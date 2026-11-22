@@ -314,6 +314,81 @@ async function docSave(user,p){
  return {ok:true,message:'Trecho salvo no Google Docs original. O restante do documento foi preservado.'};
 }
 
+
+// Apps Script integration: one-way, scoped, aggregate-only feed; no public web-app endpoint.
+const APPS_SCRIPT_SHEET_ID='1DdwqLHLDsHzD5dF344gKRtQSQMbhN-DplkqMc7z9sdI';
+const APPS_SCRIPT_TOKEN=/^psc_[A-Za-z0-9_-]{43}$/;
+async function appsScriptConnections(user){
+ const rows=await db('prescon_apps_script_tokens',{query:'select=id,label,spreadsheet_id,issued_at,expires_at,last_used_at,revoked_at&owner_user_id=eq.'+user.id+'&order=issued_at.desc&limit=30'});
+ return {connections:rows.map(r=>({
+  id:r.id,label:r.label,spreadsheet_id:r.spreadsheet_id,issued_at:r.issued_at,
+  expires_at:r.expires_at,last_used_at:r.last_used_at,revoked_at:r.revoked_at,
+  status:r.revoked_at?'revoked':Date.parse(r.expires_at)<=Date.now()?'expired':'active'
+ }))};
+}
+async function issueAppsScriptToken(user,body){
+ const label=clean(body.label||'Planilha Conselho 2026',100);
+ if(label.length<2)bad(400,'Informe um nome para a conexão.');
+ // This first integration is purpose-bound to the existing Council spreadsheet.
+ const id=body.spreadsheetId||APPS_SCRIPT_SHEET_ID;
+ if(id!==APPS_SCRIPT_SHEET_ID)bad(403,'Esta versão só sincroniza a planilha institucional autorizada.');
+ const known=await db('prescon_apps_script_tokens',{query:'select=id&owner_user_id=eq.'+user.id+'&revoked_at=is.null&expires_at=gt.'+new Date().toISOString()+'&limit=12'});
+ if(known.length>=5)bad(409,'Limite de cinco conexões ativas; revogue uma antes de criar outra.');
+ const token='psc_'+b64(crypto.getRandomValues(new Uint8Array(32)));
+ const rows=await db('prescon_apps_script_tokens',{method:'POST',prefer:'return=representation',data:{
+  owner_user_id:user.id,label,token_hash:await hash(token),spreadsheet_id:id,
+  expires_at:new Date(Date.now()+180*86400000).toISOString()
+ }});
+ return {token,connection:{id:rows[0].id,label,expires_at:rows[0].expires_at},message:'Copie esta chave agora. Ela não será exibida novamente.'};
+}
+async function revokeAppsScriptToken(user,body){
+ const id=String(body.id||'');
+ if(!UUID.test(id))bad(400,'Conexão inválida.');
+ const rows=await db('prescon_apps_script_tokens',{method:'PATCH',
+  query:'id=eq.'+id+'&owner_user_id=eq.'+user.id+'&revoked_at=is.null',
+  prefer:'return=representation',data:{revoked_at:new Date().toISOString()}});
+ if(!rows.length)bad(404,'Conexão já revogada ou não encontrada.');
+ return {ok:true,message:'Conexão revogada: o Apps Script não receberá novas atualizações.'};
+}
+async function appsScriptSnapshot(req){
+ const h=req.headers.get('authorization')||'';
+ if(!h.startsWith('Bearer ')||!APPS_SCRIPT_TOKEN.test(h.slice(7)))bad(401,'Conexão Apps Script inválida.');
+ const tokenHash=await hash(h.slice(7));
+ const records=await db('prescon_apps_script_tokens',{
+  query:'select=id,owner_user_id,spreadsheet_id,expires_at,revoked_at&token_hash=eq.'+tokenHash+'&limit=1'
+ });
+ const record=records[0];
+ if(!record||record.revoked_at||Date.parse(record.expires_at)<Date.now())bad(401,'Esta conexão foi revogada ou expirou.');
+ const user=(await db('profiles',{query:'select=id,role,active&id=eq.'+record.owner_user_id+'&limit=1'}))[0];
+ if(!user?.active||user.role!=='prescon')bad(403,'Não existe PRESCON autorizada para esta conexão.');
+ // Deliberately fetch only summary fields: no votes, form answers, justifications or attachments.
+ const [ejs,demands,forms]=await Promise.all([
+  db('ejs',{query:'select=id,name&order=name.asc&limit=100'}),
+  db('demands',{query:'select=ej_id,status,due_at&order=created_at.desc&limit=4000'}),
+  db('portal_forms',{query:'select=status,kind&limit=250'})
+ ]);
+ const today=new Date().toISOString().slice(0,10);
+ const rows=ejs.map(e=>{
+  const owned=demands.filter(d=>d.ej_id===e.id);
+  return {ej:e.name,
+   abertas:owned.filter(d=>d.status==='pendente'||d.status==='em_andamento').length,
+   pendentes:owned.filter(d=>d.status==='pendente').length,
+   andamento:owned.filter(d=>d.status==='em_andamento').length,
+   justificadas:owned.filter(d=>d.status==='justificada').length,
+   concluidas:owned.filter(d=>d.status==='concluida').length,
+   vencidas:owned.filter(d=>['pendente','em_andamento'].includes(d.status)&&d.due_at&&d.due_at<today).length};
+ });
+ await db('prescon_apps_script_tokens',{method:'PATCH',query:'id=eq.'+record.id,
+  data:{last_used_at:new Date().toISOString()}});
+ return {schema_version:1,scope:'council-summary-readonly',target_spreadsheet_id:record.spreadsheet_id,
+  generated_at:new Date().toISOString(),ejs:rows,
+  totals:{ejs:ejs.length,demands:demands.length,
+    open_demands:rows.reduce((n,r)=>n+r.abertas,0),
+    expired_demands:rows.reduce((n,r)=>n+r.vencidas,0),
+    open_forms:forms.filter(f=>f.status==='open').length},
+  privacy:'Não inclui votos, respostas de formulários, justificativas, anexos ou decisões individuais.'};
+}
+
 Deno.serve(async req=>{
  const origin=req.headers.get('origin')||'';
  if(origin&&!ORIGINS.has(origin))return response(req,{error:'Origem não autorizada.'},403);
@@ -326,10 +401,15 @@ Deno.serve(async req=>{
   if(url.pathname.endsWith('/callback'))return await callback(url);
   const action=url.searchParams.get('action')||'dashboard';
   if(action==='health')return response(req,{ok:true,backend:'Supabase Edge Functions',oauthConfigured:oauthReady()});
+  if(action==='apps_script_snapshot'){
+   if(req.method!=='GET')bad(405,'Método não permitido.');
+   return response(req,await appsScriptSnapshot(req));
+  }
   const user=await identity(req);
   if(req.method==='GET'){
    if(action==='dashboard')return response(req,await dashboard(user));
    if(action==='connect')return response(req,await authUrl(user));
+   if(action==='apps_script_connections')return response(req,await appsScriptConnections(user));
    if(action==='drive_list')return response(req,await driveList(user,url.searchParams));
    if(action==='sheet_read')return response(req,await sheetRead(user,url.searchParams));
    if(action==='doc_read')return response(req,await docRead(user,url.searchParams));
@@ -339,7 +419,8 @@ Deno.serve(async req=>{
   if(Number(req.headers.get('content-length')||0)>200000)bad(413,'Requisição muito grande.');
   const p=await req.json();
   const ops={meeting_create:()=>createMeeting(user,p),task_create:()=>taskCreate(user,p),task_status:()=>taskStatus(user,p),
-   demand_create:()=>demandCreate(user,p),decide:()=>decide(user,p),organize:()=>organize(user),export:()=>exportFile(user,p),sheet_save:()=>sheetSave(user,p),doc_save:()=>docSave(user,p)};
+   demand_create:()=>demandCreate(user,p),decide:()=>decide(user,p),organize:()=>organize(user),export:()=>exportFile(user,p),sheet_save:()=>sheetSave(user,p),doc_save:()=>docSave(user,p),
+   apps_script_issue:()=>issueAppsScriptToken(user,p),apps_script_revoke:()=>revokeAppsScriptToken(user,p)};
   if(!ops[action])bad(404,'Ação não encontrada.');
   return response(req,await ops[action]());
  }catch(e){return response(req,{error:e instanceof ErrorHttp?e.message:'O servidor não conseguiu concluir a operação.'},e instanceof ErrorHttp?e.status:500)}
