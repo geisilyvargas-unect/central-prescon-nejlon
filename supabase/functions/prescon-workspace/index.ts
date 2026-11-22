@@ -194,10 +194,51 @@ const FILE_ID=/^[a-zA-Z0-9_-]{12,200}$/;
 const FOLDER='1lMt1bSog2AiDGEiYPf9uO2gQaXEOuNeg';
 function fileId(x){const id=String(x||'');if(!FILE_ID.test(id))bad(400,'Arquivo do Google Drive inválido.');return id}
 async function fileInfo(id,token){
- return google('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId(id))+'?fields=id,name,mimeType,webViewLink,modifiedTime,parents,capabilities(canEdit)&supportsAllDrives=true',token);
+ return google('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(fileId(id))+'?fields=id,name,mimeType,webViewLink,modifiedTime,parents,trashed,capabilities(canEdit)&supportsAllDrives=true',token);
 }
+async function requireManagedLocation(user,fileIdToCheck,token){
+  const settings=(await db('prescon_preferences',{
+   query:'select=private_root_folder_id,council_root_folder_id&owner_user_id=eq.'+user.id+'&limit=1'
+  }))[0]||{};
+  const roots=[FOLDER,settings.private_root_folder_id,settings.council_root_folder_id]
+   .filter(x=>typeof x==='string'&&FILE_ID.test(x));
+  // Explicitly approved institutional 2026 dashboard spreadsheet.
+  if(fileIdToCheck==='1DdwqLHLDsHzD5dF344gKRtQSQMbhN-DplkqMc7z9sdI'){
+   const info=await fileInfo(fileIdToCheck,token);
+   if(info.trashed)bad(403,'O arquivo foi excluído.');
+   return {root:'painel-conselho-2026'};
+  }
+  const pending=[fileIdToCheck],visited=new Set();
+  for(let depth=0;pending.length&&depth<35;depth++){
+   const next=pending.shift();
+   if(!next||visited.has(next))continue;
+   visited.add(next);
+   const info=await fileInfo(next,token);
+   if(info.trashed)bad(403,'O arquivo foi excluído.');
+   if(roots.includes(next))return {root:next};
+   for(const parent of info.parents||[])if(FILE_ID.test(parent)&&!visited.has(parent))pending.push(parent);
+  }
+  bad(403,'Este arquivo está fora das pastas institucionais autorizadas para a Central PRESCON.');
+}
+async function auditEdit(user,fileIdValue,type,target,before,after,root,version){
+ const rows=await db('prescon_google_edit_audit',{method:'POST',prefer:'return=representation',data:{
+  owner_user_id:user.id,google_file_id:fileIdValue,file_type:type,
+  target:clean(target,300),before_hash:await hash(before),after_hash:await hash(after),
+  parent_root_id:root,remote_version:version?String(version).slice(0,180):null,result:'unverified'
+ }});
+ return rows[0].id;
+}
+async function confirmEditAudit(user,id){
+ try{
+  await db('prescon_google_edit_audit',{method:'PATCH',
+   query:'id=eq.'+id+'&owner_user_id=eq.'+user.id,data:{result:'confirmed'}});
+  return true;
+ }catch{return false}
+}
+
 async function driveList(user,params){
  const token=await googleToken(user),id=params.get('folder')||FOLDER;fileId(id);
+ await requireManagedLocation(user,id,token);
  const query="'"+id+"' in parents and trashed = false";
  const search=new URLSearchParams({q:query,fields:'nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime,parents,capabilities(canEdit))',
   pageSize:'100',orderBy:'name',supportsAllDrives:'true',includeItemsFromAllDrives:'true'});
@@ -217,7 +258,8 @@ async function sheetMeta(id,token){
  return google('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id)+'?fields=spreadsheetId,properties(title),sheets(properties(sheetId,title,hidden,gridProperties(rowCount,columnCount)))',token);
 }
 async function sheetRead(user,params){
- const token=await googleToken(user),id=fileId(params.get('id')),info=await fileInfo(id,token);
+ const token=await googleToken(user),id=fileId(params.get('id'));await requireManagedLocation(user,id,token);
+ const info=await fileInfo(id,token);
  if(info.mimeType!=='application/vnd.google-apps.spreadsheet')bad(400,'Este arquivo não é uma planilha Google.');
  const meta=await sheetMeta(id,token);
  const tabs=(meta.sheets||[]).map(s=>({id:s.properties?.sheetId,title:s.properties?.title,hidden:!!s.properties?.hidden,rows:s.properties?.gridProperties?.rowCount||0,cols:s.properties?.gridProperties?.columnCount||0}));
@@ -236,7 +278,9 @@ async function sheetRead(user,params){
   url:info.webViewLink||'https://docs.google.com/spreadsheets/d/'+id+'/edit'};
 }
 async function sheetSave(user,p){
- const token=await googleToken(user),id=fileId(p.id),info=await fileInfo(id,token);
+ const token=await googleToken(user),id=fileId(p.id);
+ const allowed=await requireManagedLocation(user,id,token);
+ const info=await fileInfo(id,token);
  if(info.mimeType!=='application/vnd.google-apps.spreadsheet'||info.capabilities?.canEdit!==true)bad(403,'Sua conta Google não tem edição desta planilha.');
  const meta=await sheetMeta(id,token),tab=clean(p.tab,200);
  const sheet=sheetTab(tab,meta.sheets),cell=String(p.cell||'').toUpperCase();
@@ -244,7 +288,8 @@ async function sheetSave(user,p){
  const m=cell.match(/^([A-Z]+)([0-9]+)$/);
  let col=0;for(const letter of m[1])col=col*26+letter.charCodeAt(0)-64;
  if(col>(sheet.properties?.gridProperties?.columnCount||0)||Number(m[2])>(sheet.properties?.gridProperties?.rowCount||0))bad(400,'A célula está fora dos limites da aba.');
- const before=clean(p.before,10000),next=String(p.value??'');
+ const before=String(p.before??''),next=String(p.value??'');
+ if(before.length>10000)bad(400,'Valor anterior longo demais.');
  if(next.length>10000)bad(400,'Valor longo demais.');
  const ref="'"+tab.replaceAll("'","''")+"'!"+cell,base='https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id)+'/values/'+encodeURIComponent(ref);
  const current=await google(base+'?valueRenderOption=FORMULA',token);
@@ -252,8 +297,10 @@ async function sheetSave(user,p){
  if(actual!==before)bad(409,'Esta célula mudou no Google Drive desde a abertura. Atualize a planilha antes de salvar.');
  if(actual===next)return {ok:true,unchanged:true,message:'Sem alterações na célula.'};
  // Values.update modifies the requested cell only and preserves validation and formatting elsewhere.
+ const auditId=await auditEdit(user,id,'sheet',tab+'!'+cell,actual,next,allowed.root,info.modifiedTime);
  await google(base+'?valueInputOption=USER_ENTERED',token,{method:'PUT',data:{range:ref,majorDimension:'ROWS',values:[[next]]}});
- return {ok:true,message:'Célula '+cell+' atualizada na planilha original do Google Drive.'};
+ const confirmed=await confirmEditAudit(user,auditId);
+ return {ok:true,message:confirmed?'Célula '+cell+' salva no arquivo original e registrada na auditoria.':'Célula salva no Google Sheets, mas o registro de auditoria não foi confirmado. Confira o arquivo.',auditConfirmed:confirmed};
 }
 async function docsData(id,token){
  return google('https://docs.googleapis.com/v1/documents/'+encodeURIComponent(id)+'?includeTabsContent=true',token);
@@ -286,14 +333,17 @@ function allDocRuns(doc){
  return {runs:results.slice(0,500),tabs,totalRuns:results.length};
 }
 async function docRead(user,params){
- const token=await googleToken(user),id=fileId(params.get('id')),info=await fileInfo(id,token);
+ const token=await googleToken(user),id=fileId(params.get('id'));await requireManagedLocation(user,id,token);
+ const info=await fileInfo(id,token);
  if(info.mimeType!=='application/vnd.google-apps.document')bad(400,'Este arquivo não é um documento Google.');
  const doc=await docsData(id,token),content=allDocRuns(doc);
  return {type:'doc',id,title:doc.title||info.name,revisionId:doc.revisionId||null,canEdit:info.capabilities?.canEdit===true,
   ...content,url:info.webViewLink||'https://docs.google.com/document/d/'+id+'/edit'};
 }
 async function docSave(user,p){
- const token=await googleToken(user),id=fileId(p.id),info=await fileInfo(id,token);
+ const token=await googleToken(user),id=fileId(p.id);
+ const allowed=await requireManagedLocation(user,id,token);
+ const info=await fileInfo(id,token);
  if(info.mimeType!=='application/vnd.google-apps.document'||info.capabilities?.canEdit!==true)bad(403,'Sua conta não pode editar esse documento.');
  const start=Number(p.start),end=Number(p.end),old=String(p.before??''),value=String(p.value??''),tabId=p.tabId||null;
  if(!Number.isInteger(start)||!Number.isInteger(end)||start<1||end<=start||end-start!==old.length||old.length>5000||value.length>5000)bad(400,'Trecho do documento inválido.');
@@ -308,10 +358,12 @@ async function docSave(user,p){
  const location={index:start,...(tabId?{tabId}:{})};
  const requests=[{deleteContentRange:{range}}];
  if(value)requests.push({insertText:{location,text:value}});
+ const auditId=await auditEdit(user,id,'doc',(tabId||'documento')+':'+start+'-'+end,old,value,allowed.root,doc.revisionId);
  await google('https://docs.googleapis.com/v1/documents/'+encodeURIComponent(id)+':batchUpdate',token,{
   method:'POST',data:{requests,writeControl:{requiredRevisionId:doc.revisionId}}
  });
- return {ok:true,message:'Trecho salvo no Google Docs original. O restante do documento foi preservado.'};
+ const confirmed=await confirmEditAudit(user,auditId);
+ return {ok:true,message:confirmed?'Trecho salvo no Google Docs original e registrado na auditoria.':'Trecho salvo no Google Docs, mas a auditoria não foi confirmada. Confira o arquivo.',auditConfirmed:confirmed};
 }
 
 
