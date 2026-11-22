@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const backend=read('supabase/functions/prescon-workspace/index.ts');
+const browser=read('pages/deliberacoes.js');
+const script=read('apps-script/Codigo.gs');
+const html=read('pages/deliberacoes.html');
+for(const [name,source] of [['Edge Function',backend],['Portal',browser],['Apps Script',script]])
+ new vm.Script(source,{filename:name});
+const assert=(x,msg)=>{if(!x)throw Error(msg)};
+assert(html.includes('type="file"')&&html.includes('.xlsx,.xls,.ods'),'Missing mandatory workbook upload');
+assert(html.includes('name="confirm"')&&html.includes('name="decision"'),'Missing PRESCON approval');
+assert(backend.includes("source_kind:kind")&&backend.includes("status:'draft'"),'Source must start as draft');
+assert(backend.includes("form.status!=='closed'"),'Report must be blocked while voting is open');
+assert(backend.includes("state==='pending_review'"),'Unreviewed votes must block finalization');
+assert(backend.includes("p.confirm!==true"),'PRESCON explicit confirmation required');
+assert(backend.includes("status:'finalized'"),'Final report state missing');
+assert(backend.includes("prescon_deliberation_sources"),'Missing source persistence');
+assert(backend.includes("crypto.subtle.digest('SHA-256',binary)"),'Whole-file digest required');
+assert(script.includes('PRESCON_DELIBERACOES_GID')&&script.includes('PRESCON_AUTOMACOES'),'Both managed tabs required');
+assert(script.includes('atualizarAbaDeliberacoes_'),'Panel sync missing');
+assert(!/function\s+do(Get|Post)\s*\(/.test(script),'Public Apps Script endpoint prohibited');
+console.log('OK: source upload, draft, PRESCON review, final Docs and separate panel tab checks.');
