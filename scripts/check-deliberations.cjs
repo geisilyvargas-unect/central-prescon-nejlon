@@ -17,6 +17,9 @@ assert(backend.includes("p.confirm!==true"),'PRESCON explicit confirmation requi
 assert(backend.includes("status:'finalized'"),'Final report state missing');
 assert(backend.includes("prescon_deliberation_sources"),'Missing source persistence');
 assert(backend.includes("crypto.subtle.digest('SHA-256',binary)"),'Whole-file digest required');
+assert(backend.includes("padStart(2,'0')"),'Whole-file SHA-256 must not use stack-unsafe spread conversion');
+assert(backend.includes("submissions.length>=1000"),'Truncated response list must block finalization');
+assert(backend.includes("lines.join('\\n').length>145000"),'Oversized report must be blocked before creating Docs');
 assert(script.includes('PRESCON_DELIBERACOES_GID')&&script.includes('PRESCON_AUTOMACOES'),'Both managed tabs required');
 assert(script.includes('atualizarAbaDeliberacoes_'),'Panel sync missing');
 assert(!/function\s+do(Get|Post)\s*\(/.test(script),'Public Apps Script endpoint prohibited');
