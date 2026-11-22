@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id),BASE='https://imsisbixzkqphooxyfhr.supabase.co';
 const KEY='sb_publishable_mS_TDGKZhUuJi-rxc5Nu1w_IXODeo-_';
-const STORE='nejlon.prescon.solo.v1';
+const STORE='nejlon.prescon.central.session.v1';
 let session=null,sources=[];
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 try{session=JSON.parse(sessionStorage.getItem(STORE)||'null')}catch{}
