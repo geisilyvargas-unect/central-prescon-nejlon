@@ -11,4 +11,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validar integração sem segredos
-        run: node scripts/check-apps-script.cjs
+        run: node scripts/check-apps-script.cjs && node scripts/check-deliberations.cjs
