@@ -1,0 +1,61 @@
+<!doctype html><html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1b191b">
+<meta name="description" content="Conecte o Google Apps Script à Central PRESCON de maneira privada, com indicadores resumidos e atualização agendada de planilhas.">
+<title>Apps Script · Central PRESCON NEJLON</title>
+<link rel="stylesheet" href="./automation.css"><link rel="stylesheet" href="./ux-system.css"><link rel="stylesheet" href="./apps-script.css">
+<script defer src="./ux-theme.js"></script><script defer src="./apps-script.js"></script>
+</head>
+<body class="automation-page apps-script-page">
+<a class="ux-skip" href="#apps-main">Pular ao conteúdo</a>
+<header class="automation-top"><a href="../index.html">← Minha Mesa PRESCON</a><span>GOOGLE WORKSPACE · AUTOMAÇÕES</span></header>
+<main id="apps-main" class="automation-shell">
+<header class="automation-hero apps-hero"><span class="eyebrow">CONECTOR PRIVADO</span><h1>APPS SCRIPT <em>+ PRESCON</em></h1>
+<p>Atualize automaticamente uma aba de acompanhamento dentro do Painel Conselho 2026 — sem mudar as abas já usadas pelo Conselho e sem compartilhar votos ou justificativas individuais.</p></header>
+<div class="automation-note"><strong>Modelo seguro:</strong> um projeto Apps Script <b>separado e privado</b> na conta da PRESCON consulta apenas indicadores agregados. A integração não usa Web App público e não pode editar registros do Portal. Você pode revogar a conexão a qualquer momento.</div>
+
+<section class="automation-panel">
+<div class="apps-flex"><div><span class="eyebrow">IDENTIFICAÇÃO INSTITUCIONAL</span><h2 id="apps-session-label">Explorar sem senha</h2>
+<p id="apps-session-status">Entre como PRESCON para gerar ou revogar a chave de integração. Não há exigência de troca de senha.</p></div>
+<button type="button" class="btn" id="apps-logout" hidden>Sair</button></div>
+<form class="automation-form apps-login" id="apps-login-form">
+<label>E-mail institucional<input name="email" type="email" autocomplete="username" required></label>
+<label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
+<button type="submit" class="btn red">Entrar para configurar</button></form>
+<p role="status" id="apps-login-error" class="automation-message"></p>
+</section>
+
+<section class="automation-panel">
+<div class="apps-flex"><div><span class="eyebrow">PASSO 01</span><h2>Criar sua conexão</h2>
+<p>A chave é exclusiva para indicadores resumidos da planilha existente e será mostrada uma única vez. Não a envie ao grupo do Conselho nem a coloque no código público.</p></div><a href="https://docs.google.com/spreadsheets/d/1DdwqLHLDsHzD5dF344gKRtQSQMbhN-DplkqMc7z9sdI/edit" target="_blank" rel="noopener noreferrer" class="btn">Abrir Painel 2026 ↗</a></div>
+<form class="automation-form apps-connect-form" id="apps-issue-form"><label>Identificação da conexão<input name="label" maxlength="100" minlength="2" value="Painel Conselho 2026 — automação privada" required></label><button type="submit" class="btn red">Gerar chave de sincronização</button></form>
+<div class="apps-secret" id="apps-secret-panel" hidden>
+<p><strong>Copie agora:</strong> a chave não poderá ser recuperada depois desta tela.</p>
+<div class="apps-secret-row"><code id="apps-token-value"></code><button type="button" class="btn red" id="apps-copy-token">Copiar chave</button></div>
+<p class="automation-muted">Coloque a chave somente nas <strong>Propriedades do script</strong> do seu projeto privado.</p></div>
+<h3>Conexões existentes</h3><div id="apps-connections" class="apps-connections"><p class="automation-muted">Entre como PRESCON para consultar as conexões reais.</p></div>
+</section>
+
+<section class="automation-panel">
+<span class="eyebrow">PASSO 02</span><h2>Instalar seu Apps Script privado</h2>
+<p>Você só precisa fazer a configuração inicial uma vez. Depois, o próprio Google executa a sincronização em intervalos de aproximadamente seis horas, dentro dos limites do serviço.</p>
+
+<ol class="apps-steps">
+<li>Acesse <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener noreferrer">Criar novo projeto no Google Apps Script</a>. Use sua conta da PRESCON e <strong>não compartilhe o projeto</strong> com os editores da planilha.</li>
+<li>Copie o arquivo <a href="https://github.com/geisilyvargas-unect/central-prescon-nejlon/blob/main/apps-script/Codigo.gs" target="_blank" rel="noopener noreferrer">Código.gs</a> para o editor do projeto. O arquivo <a href="https://github.com/geisilyvargas-unect/central-prescon-nejlon/blob/main/apps-script/appsscript.json" target="_blank" rel="noopener noreferrer">appsscript.json</a> contém o manifesto de permissões.</li>
+<li>Em <strong>Configurações do projeto → Propriedades do script</strong>, adicione os dois valores abaixo. A chave é aquela que você copiou no Passo 01.</li>
+<li>No editor, execute <code>instalarCentralPrescon</code> e conceda as permissões solicitadas pelo Google. Não é necessário publicar como aplicativo web.</li>
+<li>Confira na planilha a nova aba <code>PRESCON_AUTOMACOES</code>. Somente essa aba será gerenciada pelo script; as outras continuarão intactas.</li>
+</ol>
+<div class="apps-properties"><div><strong>PRESCON_SYNC_TOKEN</strong><small>Valor: chave gerada acima, secreta</small></div><div><strong>PRESCON_SHEET_ID</strong><code>1DdwqLHLDsHzD5dF344gKRtQSQMbhN-DplkqMc7z9sdI</code><button id="apps-copy-sheet" type="button" class="btn">Copiar ID</button></div></div>
+</section>
+<section class="automation-panel">
+<span class="eyebrow">PASSO 03</span><h2>O que a automação atualiza?</h2>
+<div class="apps-features">
+<div><strong>Demandas por EJ</strong><p>Contagem de pendentes, em andamento, justificadas, concluídas e vencidas.</p></div>
+<div><strong>Visão consolidada</strong><p>Total de EJs, demandas em aberto, vencimentos e formulários abertos.</p></div>
+<div><strong>Atualização recorrente</strong><p>Gatilho do Google Apps Script aproximadamente a cada seis horas e sincronização manual quando você quiser.</p></div></div>
+<p class="automation-muted"><strong>Não são enviados:</strong> votos, identidade de votantes, respostas individuais, anexos, textos de justificativas e notas privadas. O Apps Script só lê do Portal; não altera nada no Supabase.</p>
+</section>
+<footer class="automation-footer">Central PRESCON · Automação privada e revogável · O Apps Script usa cotas próprias do Google e requer sua autorização inicial.</footer>
+</main></body></html>
