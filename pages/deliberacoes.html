@@ -1,0 +1,35 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deliberações · Central PRESCON</title><link rel="stylesheet" href="./automation.css"><link rel="stylesheet" href="./ux-system.css"><link rel="stylesheet" href="./apps-script.css">
+<script defer src="./ux-theme.js"></script><script defer src="./deliberacoes.js"></script></head>
+<body class="automation-page apps-script-page"><a class="ux-skip" href="#conteudo">Pular ao conteúdo</a>
+<header class="automation-top"><a href="../index.html">← Minha Mesa</a><span>DELIBERAÇÕES · DOCUMENTOS</span></header>
+<main class="automation-shell" id="conteudo">
+<header class="automation-hero apps-hero"><span class="eyebrow">PROCESSO DA PRESCON</span><h1>DELIBERAÇÕES <em>COM DOCUMENTOS</em></h1>
+<p>Crie uma deliberação a partir da planilha de Planejamento Financeiro ou Calendário. Confira a origem, publique e encerre a votação no gerenciador de formulários e só então gere o relatório final em Google Docs.</p></header>
+<div class="automation-note"><strong>Segurança:</strong> a planilha original fica na pasta privada da PRESCON. O relatório só é gerado após o encerramento da votação, a conferência das respostas e sua decisão final expressa. A atualização do Painel depende da instalação do Apps Script.</div>
+<section class="automation-panel"><h2>Acesso da PRESCON</h2><form id="delib-login" class="automation-form">
+<label>E-mail<input type="email" name="email" autocomplete="username" required></label><label>Senha<input type="password" name="password" autocomplete="current-password" required></label>
+<button class="btn red" type="submit">Entrar na gestão</button></form>
+<div class="automation-actions"><p id="delib-session">Entre para trabalhar com deliberações reais.</p><button id="delib-logout" type="button" class="btn" hidden>Sair</button></div></section>
+<section class="automation-panel"><span class="eyebrow">01 · ORIGEM DA DELIBERAÇÃO</span><h2>Importar Planejamento Financeiro ou Calendário</h2>
+<p>Envie o arquivo original. A Central o guarda no Drive privado e cria um rascunho no banco. Nenhum voto é publicado automaticamente.</p>
+<form id="delib-create" class="automation-form">
+<label>Título da deliberação<input name="title" required minlength="3" maxlength="180" placeholder="Ex.: Planejamento Financeiro Idealize 2027"></label>
+<label>Tipo<select name="kind"><option value="pf">Planejamento Financeiro</option><option value="calendar">Calendário</option></select></label>
+<label>Planilha de origem (.xlsx, .xls, .ods; até 4 MB)<input name="file" type="file" accept=".xlsx,.xls,.ods" required></label>
+<label><input type="checkbox" name="confirmed" required> Conferi o arquivo selecionado e autorizo salvá-lo no Drive privado.</label>
+<button type="submit" class="btn red">Enviar planilha e criar rascunho</button></form><p id="delib-create-status" role="status"></p></section>
+<section class="automation-panel"><span class="eyebrow">02 · VOTAÇÃO E CONFERÊNCIA</span><h2>Deliberações criadas</h2>
+<p>Antes de finalizar, abra o gerenciador, revise as perguntas, publique o formulário, confira votos e ressalvas, encerre a votação e volte aqui para gerar o documento.</p>
+<div class="automation-actions"><a href="./central-automacoes.html?area=formularios" class="btn">Abrir formulários e votos ↗</a><a href="./apps-script.html" class="btn">Configurar atualização do Painel ↗</a><button class="btn" id="delib-refresh" type="button">Atualizar situação</button></div>
+<div id="delib-list" class="apps-connections"><p>Faça login para listar as deliberações.</p></div></section>
+<section class="automation-panel"><span class="eyebrow">03 · DOCUMENTO FINAL</span><h2>Gerar relatório de deliberação no Google Docs</h2>
+<p>O documento reúne votos aceitos, ressalvas, origem, decisão e fundamentação. Fica privado até você decidir compartilhar.</p>
+<form class="automation-form" id="delib-finalize">
+<label>Deliberação encerrada<select id="delib-finalize-id" name="formId" required><option value="">Selecione uma deliberação</option></select></label>
+<label>Decisão final da PRESCON<textarea name="decision" minlength="8" rows="3" required placeholder="Ex.: Deliberação aprovada conforme decisão do Conselho..."></textarea></label>
+<label>Fundamentação, ressalvas aceitas e providências<textarea name="notes" minlength="8" rows="5" required placeholder="Registre o que foi aceito ou rejeitado e por quê."></textarea></label>
+<label><input type="checkbox" name="confirm" required> Conferi todas as respostas e autorizo gerar o relatório final privado no Google Docs.</label>
+<button class="btn red" type="submit">Gerar relatório final no Google Docs</button></form><p id="delib-finalize-status" role="status"></p>
+</section>
+<footer class="automation-footer">Central PRESCON · Arquivos originais preservados · Decisões institucionais não são automáticas</footer></main></body></html>
