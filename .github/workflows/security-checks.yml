@@ -1,0 +1,14 @@
+name: Segurança básica da Central PRESCON
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar integração sem segredos
+        run: node scripts/check-apps-script.cjs
