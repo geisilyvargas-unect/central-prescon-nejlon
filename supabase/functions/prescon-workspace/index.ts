@@ -414,10 +414,11 @@ async function appsScriptSnapshot(req){
  const user=(await db('profiles',{query:'select=id,role,active&id=eq.'+record.owner_user_id+'&limit=1'}))[0];
  if(!user?.active||user.role!=='prescon')bad(403,'Não existe PRESCON autorizada para esta conexão.');
  // Deliberately fetch only summary fields: no votes, form answers, justifications or attachments.
- const [ejs,demands,forms]=await Promise.all([
+ const [ejs,demands,forms,delibSources]=await Promise.all([
   db('ejs',{query:'select=id,name&order=name.asc&limit=100'}),
   db('demands',{query:'select=ej_id,status,due_at&order=created_at.desc&limit=4000'}),
-  db('portal_forms',{query:'select=status,kind&limit=250'})
+  db('portal_forms',{query:'select=id,title,status,kind,due_at&limit=250'}),
+  db('prescon_deliberation_sources',{query:'select=form_id,source_kind,status,report_google_url,created_at&limit=250'})
  ]);
  const today=new Date().toISOString().slice(0,10);
  const rows=ejs.map(e=>{
@@ -438,6 +439,11 @@ async function appsScriptSnapshot(req){
     open_demands:rows.reduce((n,r)=>n+r.abertas,0),
     expired_demands:rows.reduce((n,r)=>n+r.vencidas,0),
     open_forms:forms.filter(f=>f.status==='open').length},
+  deliberations:delibSources.map(x=>{const form=forms.find(f=>f.id===x.form_id);return {
+   title:form?.title||'Deliberação',type:x.source_kind,status:form?.status||'draft',
+   report_ready:x.status==='finalized',report_url:x.report_google_url||'',
+   due_at:form?.due_at||'',created_at:x.created_at
+  }}),
   privacy:'Não inclui votos, respostas de formulários, justificativas, anexos ou decisões individuais.'};
 }
 
@@ -466,7 +472,7 @@ async function createDeliberationSource(user,p){
  const pref=(await db('prescon_preferences',{query:'select=private_root_folder_id&owner_user_id=eq.'+user.id+'&limit=1'}))[0];
  if(!pref?.private_root_folder_id)bad(409,'Prepare a pasta privada no Google Workspace antes de importar a planilha.');
  await requireManagedLocation(user,pref.private_root_folder_id,token);
- const digest=await hash(String.fromCharCode(...binary.slice(0,10000))+':'+encoded.length+':'+encoded.slice(-10000));
+ const digest=b64(new Uint8Array(await crypto.subtle.digest('SHA-256',binary)));
  // The actual file is preserved in its original format; no parsing or scenario inference.
  const boundary='psc_'+crypto.randomUUID().replaceAll('-','');
  const meta=JSON.stringify({name:filename,mimeType:/\.ods$/i.test(filename)?'application/vnd.oasis.opendocument.spreadsheet':/\.xls$/i.test(filename)?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',parents:[pref.private_root_folder_id]});
