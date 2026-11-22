@@ -11,6 +11,8 @@ for(const name of ['operacao','drive-editor','deliberacoes']){
  if(/sb_secret_|SUPABASE_SERVICE_ROLE_KEY/.test(js))throw Error('Private secret leaked: '+name);
 }
 const drive=read('pages/drive-editor.js'),work=read('pages/operacao.js');
+for(const page of ['operacao','drive-editor']){if(!fs.existsSync(path.join(root,'pages',page+'.css')))throw Error('Missing stylesheet: '+page)}
+for(const page of ['operacao','drive-editor']){const html=read('pages/'+page+'.html'),js=read('pages/'+page+'.js');for(const id of [...js.matchAll(/\\$\\('([^']+)'\\)/g)].map(m=>m[1]))if(!html.includes('id="'+id+'"'))throw Error('Missing interactive target '+page+': '+id)}
 for(const action of ['drive_list','sheet_read','sheet_save','doc_read','doc_save','connect'])
  if(!drive.includes("'"+action+"'"))throw Error('Missing Drive action: '+action);
 for(const action of ['dashboard','meeting_create','task_create','demand_create','decide','organize','export','connect'])
