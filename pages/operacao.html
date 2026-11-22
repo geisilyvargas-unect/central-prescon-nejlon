@@ -1,0 +1,76 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1b191b"><meta name="description" content="Assistente individual de reuniões, decisões, relatórios e Google Workspace da PRESCON NEJLON.">
+<title>Assistente PRESCON · NEJLON</title>
+<link rel="stylesheet" href="./automation.css"><link rel="stylesheet" href="./ux-system.css"><link rel="stylesheet" href="./operacao.css">
+<script defer src="./ux-theme.js"></script><script defer src="./operacao.js"></script></head>
+<body class="automation-page personal-page"><a class="ux-skip" href="#conteudo">Pular para conteúdo</a>
+<header class="automation-top"><a href="../index.html">← Minha Mesa</a><span>CENTRAL EXCLUSIVA · PRESCON NEJLON</span></header>
+<main id="conteudo" class="automation-shell">
+<header class="automation-hero personal-hero"><span class="eyebrow">GESTÃO INDIVIDUAL E CONTINUIDADE</span><h1>ASSISTENTE DA <em>PRESCON</em></h1><p>Reuniões, tarefas, decisões, demandas e documentos num só lugar. Você pode organizar tudo sozinha e manter o Conselho trabalhando pelo Google Drive.</p></header>
+<div class="automation-note"><strong>Privacidade:</strong> a visualização é livre, mas as decisões e os documentos privados só carregam após autenticação institucional da PRESCON. A integração com o Google requer autorização da sua conta.</div>
+<section class="automation-panel" id="personal-auth"><div class="personal-flex"><div><span class="eyebrow">ACESSO INSTITUCIONAL</span><h2>Modo de exploração</h2><p>As áreas ficam visíveis sem senha, mas nenhum dado real aparece até você entrar.</p></div><div id="personal-login-area"><button class="btn red" id="personal-login-toggle" type="button">Entrar para gerenciar</button><button class="btn" id="personal-logout" type="button" hidden>Sair da gestão</button></div></div>
+<form class="automation-form personal-login-form" id="personal-login-form" hidden><label>E-mail institucional<input type="email" id="personal-email" autocomplete="username" required placeholder="seuemail@nejlondrina.com"></label><label>Senha<input type="password" id="personal-password" autocomplete="current-password" required></label><button class="btn red" type="submit">Acessar minha gestão</button></form><p id="personal-auth-message" class="automation-message" role="status"></p></section>
+<div class="personal-tabs" role="navigation" aria-label="Áreas de trabalho">
+<button data-view="inicio" class="active">Resumo</button><button data-view="decisoes">Caixa de decisões</button>
+<button data-view="reunioes">Reuniões</button><button data-view="demandas">Demandas</button>
+<button data-view="workspace">Drive, Docs e Sheets</button><button data-view="relatorios">Relatórios</button><button data-view="mensagens">Mensagens</button></div>
+<section class="personal-view" data-panel="inicio">
+<div class="automation-stat-grid" id="personal-stats"></div>
+<div class="automation-grid">
+<div class="automation-panel"><h2>Precisa de decisão</h2><div id="personal-home-decisions" class="personal-list"><p class="automation-muted">Entre para conferir as decisões reais.</p></div><button class="btn" data-target="decisoes">Analisar solicitações →</button></div>
+<div class="automation-panel"><h2>Próximos prazos</h2><div id="personal-deadlines" class="personal-list"><p class="automation-muted">Seus prazos aparecem após o login.</p></div><button class="btn" data-target="demandas">Acompanhar demandas →</button></div>
+</div>
+</section>
+<section class="personal-view" data-panel="decisoes" hidden>
+<div class="automation-panel"><div class="personal-flex"><div><h2>Caixa de decisões</h2><p>Justificativas, alterações de voto e respostas externas para sua avaliação.</p></div><button id="personal-refresh-decisions" class="btn">Atualizar</button></div><div id="personal-decisions" class="personal-list"></div></div>
+</section>
+<section class="personal-view" data-panel="reunioes" hidden>
+<div class="automation-grid">
+<div class="automation-panel"><h2>Registrar uma reunião</h2><p>Informe a pauta e apenas as decisões que realmente foram tomadas.</p>
+<form class="automation-form" id="personal-meeting-form">
+<label>Título<input name="title" minlength="3" required placeholder="Ex.: RC de novembro"></label>
+<label>Data<input name="held_on" type="date" required></label>
+<label>Pauta (um tópico por linha)<textarea name="agenda" rows="4" placeholder="Abertura&#10;Informes das EJs&#10;Pontos para decisão"></textarea></label>
+<label>Decisões e encaminhamentos (um por linha)<textarea name="decisions" rows="4" placeholder="Registrar somente deliberações efetivas"></textarea></label>
+<label>Anotações internas — privadas<textarea name="notes" rows="3"></textarea></label>
+<button class="btn red" type="submit">Salvar reunião</button></form></div>
+<div class="automation-panel"><h2>Reuniões registradas</h2><div class="personal-list" id="personal-meetings"></div></div>
+</div>
+<div class="automation-panel"><h2>Meus encaminhamentos</h2>
+<form class="automation-form personal-inline" id="personal-action-form"><label>Encaminhamento<input name="title" minlength="3" required placeholder="Ex.: Solicitar documentação"></label><label>Prazo<input name="due_on" type="date"></label><button class="btn red" type="submit">Adicionar</button></form>
+<div id="personal-actions" class="personal-list"></div></div>
+</section>
+<section class="personal-view" data-panel="demandas" hidden>
+<div class="automation-panel"><h2>Criar demanda</h2><p>Para acompanhamento individual da PRESCON, mesmo que o conselheiro continue recebendo as solicitações por WhatsApp ou Drive.</p>
+<form class="automation-form personal-create-demand" id="personal-demand-form">
+<label>EJ<select id="personal-ej" name="ejId" required><option value="">Selecione</option></select></label>
+<label>Assunto<input name="title" minlength="4" required></label>
+<label>Classificação<select name="severity"><option value="amarela">Amarela</option><option value="laranja">Laranja</option><option value="vermelha">Vermelha</option></select></label>
+<label>Prazo<input name="dueAt" type="date" required></label>
+<label class="personal-full">Descrição interna<textarea name="description" minlength="8" required rows="3"></textarea></label>
+<button class="btn red" type="submit">Registrar demanda</button></form></div>
+<div class="automation-panel"><h2>Panorama da Rede</h2><div class="personal-table-scroll" id="personal-demands"></div></div>
+</section>
+<section class="personal-view" data-panel="workspace" hidden>
+<div class="automation-panel"><div class="personal-flex"><div><h2>Google Workspace</h2><p>Drive é o arquivo institucional; Docs e Sheets recebem os documentos que você produzir.</p><p id="personal-google-status" class="personal-status"></p></div><div class="automation-actions"><button type="button" class="btn red" id="personal-connect-google">Conectar Google</button><button type="button" class="btn" id="personal-organize">Preparar pasta privada</button></div></div></div>
+<div class="automation-grid">
+<div class="automation-panel"><span class="eyebrow">CONFIDENCIAL</span><h2>Privado da PRESCON</h2><p>Justificativas, votos individuais, relatórios internos, notas e cogestão. Nada é compartilhado automaticamente.</p><div id="personal-private-root" class="personal-links"></div></div>
+<div class="automation-panel"><span class="eyebrow">O ACERVO EXISTENTE</span><h2>Drive do Conselho</h2><p>Pastas e planilha que o Conselho já conhece. Não movemos, excluímos nem sobrescrevemos os arquivos antigos.</p><div class="personal-links"><a href="https://drive.google.com/drive/folders/1lMt1bSog2AiDGEiYPf9uO2gQaXEOuNeg" target="_blank" rel="noopener noreferrer">Drive do Conselho 13 ↗</a><a href="https://docs.google.com/spreadsheets/d/1DdwqLHLDsHzD5dF344gKRtQSQMbhN-DplkqMc7z9sdI/edit" target="_blank" rel="noopener noreferrer">Painel Conselho 2026 ↗</a></div></div>
+</div>
+<div class="automation-panel"><h2>Gerar arquivos no Google</h2><p>Crie cópias novas na pasta privada. Revise antes de compartilhar manualmente no Drive do Conselho.</p>
+<div class="personal-actions-grid"><button type="button" data-export="sheet">Planilha de demandas e prazos <small>Google Sheets</small></button><button type="button" data-export="report">Relatório da gestão <small>Google Docs</small></button><button type="button" data-export="handover">Dossiê de cogestão <small>Google Docs</small></button></div></div>
+<div class="automation-panel"><h2>Arquivos já gerados</h2><div id="personal-artifacts" class="personal-list"></div></div>
+</section>
+<section class="personal-view" data-panel="relatorios" hidden>
+<div class="automation-panel"><h2>Relatório de gestão</h2><p>Consolidação das ações registradas na Central. Pode ser copiada ou gerada em Google Docs depois de conectar sua conta.</p><pre id="personal-report" class="personal-report"></pre><div class="automation-actions"><button class="btn red" type="button" id="personal-copy-report">Copiar resumo</button><button class="btn" type="button" data-export="report">Gerar no Google Docs</button></div></div>
+</section>
+<section class="personal-view" data-panel="mensagens" hidden>
+<div class="automation-panel"><h2>Mensagens para o Conselho</h2><p>Prepare o texto e escolha manualmente o grupo do Conselho. O portal não envia mensagens sozinho.</p>
+<div class="personal-actions-grid"><button data-message="deliberacao">Deliberação <small>Novo prazo ou formulário</small></button><button data-message="prazo">Cobrança de prazo <small>Lembrete de pendências</small></button><button data-message="reuniao">Convocação <small>Data, local e pauta</small></button></div>
+<label>Texto do comunicado<textarea id="personal-message" rows="9" class="personal-message"></textarea></label>
+<div class="automation-actions"><button type="button" id="personal-copy-message" class="btn red">Copiar texto</button><button type="button" id="personal-whatsapp" class="btn">Abrir WhatsApp</button></div></div>
+</section>
+<footer class="automation-footer">Central PRESCON NEJLON · Uso individual, documentos compartilhados apenas após sua revisão.</footer>
+</main><div id="personal-toast" class="automation-toast" aria-live="polite" role="status"></div>
+</body></html>
