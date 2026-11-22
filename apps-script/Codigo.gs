@@ -80,6 +80,8 @@ function sincronizarResumoPrescon() {
     sheet.getRange(7, 2, Math.max(rows.length - 6, 1), 6).setNumberFormat('0');
     sheet.setFrozenRows(6);
     sheet.autoResizeColumns(1, 8);
+    // Deliberations are synchronized into a SECOND managed tab, never existing Council tabs.
+    atualizarAbaDeliberacoes_(spreadsheet, props, snapshot.deliberations || [], when);
     SpreadsheetApp.flush();
     props.setProperty('PRESCON_LAST_SYNC_AT', new Date().toISOString());
     return 'Atualizado com sucesso: ' + snapshot.ejs.length + ' EJs, somente na aba ' + MANAGED_TAB + '.';
@@ -131,7 +133,7 @@ function buscarResumo_(token, spreadsheetId) {
   const payload = JSON.parse(res.getContentText());
   if (payload.schema_version !== 1 || payload.scope !== 'council-summary-readonly' ||
       payload.target_spreadsheet_id !== spreadsheetId || !Array.isArray(payload.ejs) ||
-      payload.ejs.length > 100 || !payload.totals) throw Error('O portal respondeu com dados incompatíveis; nada será alterado.');
+      payload.ejs.length > 100 || !payload.totals || !Array.isArray(payload.deliberations)) throw Error('O portal respondeu com dados incompatíveis; nada será alterado.');
 
   payload.ejs.forEach(e => {
     if (typeof e.ej !== 'string' || e.ej.length > 180 ||
@@ -141,6 +143,49 @@ function buscarResumo_(token, spreadsheetId) {
     }
   });
   return payload;
+}
+
+
+/** Writes only the tab registered by this script; never overwrites institutional tabs. */
+function atualizarAbaDeliberacoes_(spreadsheet, props, deliberations, when) {
+  if (!Array.isArray(deliberations) || deliberations.length > 250) throw Error('Lista de deliberações inválida.');
+  const name = 'PRESCON_DELIBERACOES';
+  const stored = props.getProperty('PRESCON_DELIBERACOES_GID');
+  let sheet = spreadsheet.getSheetByName(name);
+  if (sheet && (!stored || String(sheet.getSheetId()) !== stored)) {
+    throw Error('Já existe uma aba PRESCON_DELIBERACOES não gerenciada pelo script. Nada será sobrescrito.');
+  }
+  if (!sheet && stored) throw Error('A aba de deliberações foi removida ou renomeada. Confira antes de sincronizar.');
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(name);
+    props.setProperty('PRESCON_DELIBERACOES_GID', String(sheet.getSheetId()));
+  }
+  const rows = [
+    ['DELIBERAÇÕES — ATUALIZAÇÃO AUTOMÁTICA PRESCON', '', '', '', '', ''],
+    ['Atualizado em: ' + when, '', '', '', '', ''],
+    ['Título', 'Tipo', 'Situação da votação', 'Relatório final', 'Prazo', 'Link do relatório']
+  ];
+  deliberations.forEach(d => {
+    if (!d || typeof d.title !== 'string' || d.title.length > 180 ||
+      !['pf','calendar'].includes(d.type) || !['draft','open','closed'].includes(d.status) ||
+      typeof d.report_ready !== 'boolean' || typeof d.report_url !== 'string' ||
+      (d.report_url && !/^https:\/\/docs\.google\.com\/document\/d\/[A-Za-z0-9_-]+\/edit$/.test(d.report_url))) {
+      throw Error('Dados de deliberação incompatíveis. Nenhuma aba institucional será modificada.');
+    }
+    rows.push([textoSeguro_(d.title), d.type === 'pf' ? 'Planejamento Financeiro' : 'Calendário',
+      d.status === 'draft' ? 'Rascunho' : d.status === 'open' ? 'Aberta' : 'Encerrada',
+      d.report_ready ? 'Gerado' : 'Pendente', textoSeguro_(d.due_at || ''), textoSeguro_(d.report_url)]);
+  });
+  const count = Math.max(sheet.getLastRow(), rows.length);
+  if (count > 300) throw Error('A aba de deliberações ultrapassou o limite seguro de linhas.');
+  if (sheet.getMaxRows() < rows.length) sheet.insertRowsAfter(sheet.getMaxRows(), rows.length - sheet.getMaxRows());
+  if (sheet.getMaxColumns() < 6) sheet.insertColumnsAfter(sheet.getMaxColumns(), 6 - sheet.getMaxColumns());
+  sheet.getRange(1,1,count,6).clearContent();
+  sheet.getRange(1,1,rows.length,6).setValues(rows);
+  sheet.getRange(1,1,1,6).setBackground('#212023').setFontColor('#FFFFFF').setFontWeight('bold');
+  sheet.getRange(3,1,1,6).setBackground('#C92F37').setFontColor('#FFFFFF').setFontWeight('bold');
+  sheet.setFrozenRows(3);
+  sheet.autoResizeColumns(1,6);
 }
 
 function numeroSeguro_(n) { return Number(n) || 0; }
