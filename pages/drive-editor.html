@@ -1,0 +1,64 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1b191b"><meta name="description" content="Explore e edite arquivos do Google Drive do Conselho pelo portal privado da PRESCON.">
+<title>Editor do Drive · Central PRESCON</title>
+<link rel="stylesheet" href="./automation.css"><link rel="stylesheet" href="./ux-system.css"><link rel="stylesheet" href="./drive-editor.css">
+<script defer src="./ux-theme.js"></script><script defer src="./drive-editor.js"></script></head>
+<body class="automation-page drive-editor-page">
+<a class="ux-skip" href="#conteudo">Pular para o conteúdo</a>
+<header class="automation-top"><a href="../index.html">← Minha Mesa PRESCON</a><span>DRIVE · DOCS · SHEETS</span></header>
+<main class="automation-shell" id="conteudo">
+<header class="automation-hero drive-editor-hero"><span class="eyebrow">O DRIVE QUE O CONSELHO JÁ CONHECE</span><h1>EDITE PELO <em>PORTAL</em></h1>
+<p>Localize o arquivo existente, altere um trecho de Google Docs ou uma célula de Google Sheets e salve no próprio documento. PDFs e outros formatos continuam disponíveis para abrir no Drive.</p></header>
+<div class="automation-note"><strong>Sem duplicatas:</strong> o botão Salvar modifica o arquivo original. A Central exige login PRESCON, autorização da sua conta Google e permissão de edição no arquivo. Nada é enviado automaticamente ao grupo do Conselho.</div>
+<section class="automation-panel" id="drive-gate">
+<div class="drive-gate-top"><div><h2>Conectar à sua gestão</h2><p id="drive-login-info">Entre com a conta institucional da PRESCON para acessar os arquivos existentes.</p></div>
+<div class="automation-actions"><button class="btn" id="drive-logout" type="button" hidden>Sair</button><button class="btn red" type="button" id="drive-connect" hidden>Conectar conta Google</button></div></div>
+<form class="automation-form" id="drive-login-form"><label>E-mail da PRESCON<input type="email" name="email" autocomplete="username" required></label>
+<label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
+<button class="btn red" type="submit">Acessar arquivos do Drive</button></form><p id="drive-status" role="status" class="automation-message"></p></section>
+<section class="drive-layout" id="drive-app" hidden>
+<div class="automation-panel drive-sidebar">
+<div class="drive-sidebar-head"><div><h2>Explorar pastas</h2><p>Drive do Conselho 13</p></div><button type="button" class="btn" id="drive-home">Início</button></div>
+<div class="drive-folder-actions"><button type="button" class="btn" id="drive-back" disabled>Voltar</button><button type="button" class="btn" id="drive-refresh">Atualizar</button></div>
+<p class="drive-current" id="drive-folder-name">Drive do Conselho</p>
+<label class="drive-search-label">Pesquisar nesta pasta<input type="search" id="drive-search" placeholder="Nome do arquivo ou pasta"></label>
+<div id="drive-list" class="drive-file-list" role="list"></div>
+<button class="btn" id="drive-more" type="button" hidden>Carregar mais arquivos</button>
+</div>
+<div class="automation-panel drive-editor-main">
+<div id="drive-empty" class="drive-editor-empty"><span class="eyebrow">SELECIONE UM ARQUIVO</span><h2>Os arquivos continuam no Google Drive.</h2><p>Abra uma planilha ou um documento na lista ao lado. Você poderá conferir o conteúdo e editar somente o que escolher.</p></div>
+<div id="drive-file-editor" hidden>
+<div class="drive-editor-top"><div><span class="eyebrow" id="drive-type">ARQUIVO</span><h2 id="drive-title"></h2><p id="drive-description"></p></div><a id="drive-original-link" class="btn" href="#" target="_blank" rel="noopener noreferrer">Abrir no Google ↗</a></div>
+<div id="drive-sheet-controls" class="drive-sheet-controls" hidden>
+<label>Aba<select id="drive-sheet-tab" aria-label="Aba da planilha"></select></label>
+<div class="drive-page-actions"><button type="button" class="btn" id="drive-previous-page">50 linhas anteriores</button>
+<strong id="drive-page-label"></strong><button type="button" class="btn" id="drive-next-page">Próximas 50 linhas</button></div>
+</div>
+<div id="drive-sheet-grid" class="drive-sheet-grid" hidden></div>
+<div id="drive-cell-editor" class="drive-selection" hidden>
+<div class="drive-selection-head"><h3>Editar célula <span id="drive-cell-label"></span></h3><button type="button" class="btn" id="drive-cell-cancel">Cancelar</button></div>
+<label>Valor atual ou fórmula<textarea id="drive-cell-value" rows="3" spellcheck="false"></textarea></label>
+<p class="drive-warning" id="drive-cell-warning">Somente a célula selecionada será atualizada. A formatação e as demais células permanecem intactas.</p>
+<button type="button" id="drive-cell-save" class="btn red">Salvar no Google Sheets original</button>
+</div>
+<div id="drive-doc-content" class="drive-doc-content" hidden></div>
+<div id="drive-doc-selection" class="drive-selection" hidden>
+<div class="drive-selection-head"><h3>Editar trecho do documento</h3><button type="button" class="btn" id="drive-doc-cancel">Cancelar</button></div>
+<p class="automation-muted">Essa edição substitui somente o trecho escolhido, preservando os outros parágrafos e elementos do documento. Para editar imagens, tabelas complexas ou layout, use o Google Docs.</p>
+<label>Novo texto do trecho<textarea id="drive-doc-value" rows="5"></textarea></label>
+<button type="button" id="drive-doc-save" class="btn red">Salvar no Google Docs original</button>
+</div>
+<div id="drive-unsupported" class="drive-unsupported" hidden><p>Esse formato não tem editor interno nesta versão. Abra o arquivo original no Google Drive para editá-lo ou visualizá-lo com o aplicativo adequado.</p></div>
+</div></div>
+</section>
+<section class="automation-panel" id="drive-help">
+<h2>O que já dá para editar aqui?</h2>
+<div class="drive-help-grid">
+<div><strong>Google Sheets</strong><p>Abas existentes, valores e fórmulas de células individuais. A Central confere se o valor mudou antes de salvar.</p></div>
+<div><strong>Google Docs</strong><p>Trechos de texto em documentos existentes, com verificação de revisão para evitar sobrescrever alterações de terceiros.</p></div>
+<div><strong>PDF, Word, imagens e outros</strong><p>Consulta por link. A edição interna desses formatos ainda não está disponível; os arquivos originais permanecem preservados.</p></div>
+</div>
+</section>
+<footer class="automation-footer">Central PRESCON NEJLON · Nunca sobrescreve arquivos sem sua confirmação. Backup e histórico de versões continuam sob os recursos do Google Workspace.</footer>
+</main>
+</body></html>
