@@ -22,7 +22,7 @@ list('personal-artifacts',d.artifacts||[],x=>'<p><a target="_blank" rel="noopene
 $('personal-report').textContent='Central PRESCON NEJLON\nDemandas: '+(d.stats?.total_demands||0)+'\nDemandas abertas: '+(d.stats?.open_demands||0)+'\nDecisões pendentes: '+(d.stats?.pending_decisions||0)+'\nFormulários abertos: '+(d.stats?.open_forms||0);
 }
 async function load(){data=await api('dashboard');render();status('Dados atualizados.');$('personal-login-form').hidden=true;$('personal-logout').hidden=false;$('personal-login-toggle').hidden=true}
-async function run(fn){try{await fn()}catch(e){status(e.message);$('personal-toast').textContent=e.message}}
+async function run(fn){status('Processando solicitação…');try{await fn()}catch(e){status(e.message);$('personal-toast').textContent=e.message}}
 $('personal-login-toggle').onclick=()=>{$('personal-login-form').hidden=!$('personal-login-form').hidden};
 $('personal-login-form').onsubmit=e=>{e.preventDefault();run(async()=>{const email=$('personal-email').value,password=$('personal-password').value;session=await parse(await fetch(SB+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password})}));sessionStorage.setItem(STORE,JSON.stringify(session));$('personal-password').value='';await load()})};
 $('personal-logout').onclick=()=>{session=null;data=null;sessionStorage.removeItem(STORE);location.reload()};
@@ -41,5 +41,5 @@ $('personal-copy-report').onclick=()=>run(async()=>{await navigator.clipboard.wr
 document.querySelectorAll('[data-message]').forEach(b=>b.onclick=()=>{$('personal-message').value=({deliberacao:'Conselho, temos uma nova deliberação. Confiram o formulário e o prazo informado na Central.',prazo:'Conselho, reforço a importância de conferir as demandas e seus respectivos prazos.',reuniao:'Conselho, segue convocação para nossa próxima reunião. Data, local e pauta serão informados pela PRESCON.'})[b.dataset.message]});
 $('personal-copy-message').onclick=()=>run(async()=>{await navigator.clipboard.writeText($('personal-message').value);status('Mensagem copiada.')});
 $('personal-whatsapp').onclick=()=>{const msg=$('personal-message').value;if(msg)window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank','noopener')};
-if(session?.access_token)run(load);
+if(session?.access_token)run(load);else status('Modo de exploração ativo. Clique em Entrar para gerenciar para usar os recursos.');
 })();
