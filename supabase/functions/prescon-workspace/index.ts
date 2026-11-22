@@ -441,6 +441,131 @@ async function appsScriptSnapshot(req){
   privacy:'Não inclui votos, respostas de formulários, justificativas, anexos ou decisões individuais.'};
 }
 
+
+// Deliberation workflow: original workbook -> private Drive file -> review -> final Google Docs.
+const WORKBOOK_EXT=/\.(xlsx|xls|ods)$/i;
+const MAX_WORKBOOK=4*1024*1024;
+function escapeReport(v){return String(v??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,' ').slice(0,3500)}
+async function sourceList(user){
+ const rows=await db('prescon_deliberation_sources',{query:'select=*&owner_user_id=eq.'+user.id+'&order=created_at.desc&limit=150'});
+ const forms=await db('portal_forms',{query:'select=id,title,status,due_at&limit=250'});
+ return {sources:rows.map(r=>({form_id:r.form_id,source_kind:r.source_kind,filename:r.original_filename,source_url:r.google_file_url,status:r.status,
+  report_url:r.report_google_url,created_at:r.created_at,title:forms.find(f=>f.id===r.form_id)?.title||'Deliberação',
+  form_status:forms.find(f=>f.id===r.form_id)?.status||'draft'}))};
+}
+async function createDeliberationSource(user,p){
+ const title=clean(p.title,180),kind=p.kind,filename=clean(p.filename,200),encoded=String(p.base64||'');
+ if(title.length<3||!['pf','calendar'].includes(kind))bad(400,'Título ou tipo de deliberação inválido.');
+ if(!WORKBOOK_EXT.test(filename))bad(400,'Envie uma planilha .xlsx, .xls ou .ods.');
+ if(encoded.length>Math.ceil(MAX_WORKBOOK*4/3)+12||!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded))bad(413,'Arquivo inválido ou maior que 4 MB.');
+ let binary;try{binary=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))}catch{bad(400,'O conteúdo da planilha é inválido.')}
+ if(binary.length<50||binary.length>MAX_WORKBOOK)bad(400,'O arquivo precisa ter entre 50 bytes e 4 MB.');
+ const isZip=binary[0]===0x50&&binary[1]===0x4b,ole=binary[0]===0xd0&&binary[1]===0xcf;
+ if((/\.xlsx$|\.ods$/i.test(filename)&&!isZip)||(/\.xls$/i.test(filename)&&!ole))bad(400,'A assinatura do arquivo não corresponde à extensão.');
+ const token=await googleToken(user);
+ const pref=(await db('prescon_preferences',{query:'select=private_root_folder_id&owner_user_id=eq.'+user.id+'&limit=1'}))[0];
+ if(!pref?.private_root_folder_id)bad(409,'Prepare a pasta privada no Google Workspace antes de importar a planilha.');
+ await requireManagedLocation(user,pref.private_root_folder_id,token);
+ const digest=await hash(String.fromCharCode(...binary.slice(0,10000))+':'+encoded.length+':'+encoded.slice(-10000));
+ // The actual file is preserved in its original format; no parsing or scenario inference.
+ const boundary='psc_'+crypto.randomUUID().replaceAll('-','');
+ const meta=JSON.stringify({name:filename,mimeType:/\.ods$/i.test(filename)?'application/vnd.oasis.opendocument.spreadsheet':/\.xls$/i.test(filename)?'application/vnd.ms-excel':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',parents:[pref.private_root_folder_id]});
+ const bytes=new TextEncoder().encode('--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+boundary+'\r\nContent-Type: application/octet-stream\r\n\r\n');
+ const suffix=new TextEncoder().encode('\r\n--'+boundary+'--');
+ const multipart=new Uint8Array(bytes.length+binary.length+suffix.length);multipart.set(bytes);multipart.set(binary,bytes.length);multipart.set(suffix,bytes.length+binary.length);
+ const uploaded=await asJson(await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{
+  method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'multipart/related; boundary='+boundary},body:multipart
+ }));
+ const form=await db('portal_forms',{method:'POST',prefer:'return=representation',data:{
+  title,description:'Deliberação '+(kind==='pf'?'de Planejamento Financeiro':'de Calendário')+
+  '. Planilha original anexada no Drive privado. A PRESCON deve conferir o arquivo e o conteúdo antes da publicação.',
+  questions:kind==='pf'?[
+   {id:'rateios',label:'Sistema de Rateios — voto',type:'choice',required:true,options:['Aprovo','Reprovo','Abstenção']},
+   {id:'cenario1',label:'Cenário 1 — voto',type:'choice',required:true,options:['Aprovo','Reprovo','Abstenção']},
+   {id:'cenario2',label:'Cenário 2 — voto',type:'choice',required:true,options:['Aprovo','Reprovo','Abstenção']},
+   {id:'ressalvas',label:'Ressalvas e sugestões',type:'text',required:false}
+  ]:[
+   {id:'calendario',label:'Calendário proposto — voto',type:'choice',required:true,options:['Aprovo','Reprovo','Abstenção']},
+   {id:'ressalvas',label:'Ressalvas e sugestões',type:'text',required:false}
+  ],kind:kind==='pf'?'pf':'generic',status:'draft',audience:'counselor',created_by:user.id
+ }});
+ const fileUrl=uploaded.webViewLink||'https://drive.google.com/file/d/'+uploaded.id+'/view';
+ try{
+  await db('prescon_deliberation_sources',{method:'POST',data:{form_id:form[0].id,owner_user_id:user.id,source_kind:kind,original_filename:filename,
+   google_file_id:uploaded.id,google_file_url:fileUrl,original_sha256:digest,original_size:binary.length}});
+ }catch(e){await db('portal_forms',{method:'DELETE',query:'id=eq.'+form[0].id});throw e}
+ return {ok:true,form_id:form[0].id,title,source_url:fileUrl,message:'Rascunho e planilha original salvos. Confira os cenários e as perguntas antes de publicar.'};
+}
+async function finalizeDeliberation(user,p){
+ const formId=String(p.formId||'');if(!UUID.test(formId))bad(400,'Deliberação inválida.');
+ const note=clean(p.notes,3500),decision=clean(p.decision,1800);
+ if(decision.length<8||note.length<8||p.confirm!==true)bad(400,'Registre decisão, fundamentação e confirme a finalização.');
+ const source=(await db('prescon_deliberation_sources',{query:'select=*&form_id=eq.'+formId+'&owner_user_id=eq.'+user.id+'&limit=1'}))[0];
+ if(!source)bad(404,'Planilha de origem não encontrada.');
+ if(source.status==='finalized')return {ok:true,already_finalized:true,url:source.report_google_url};
+ const form=(await db('portal_forms',{query:'select=*&id=eq.'+formId+'&limit=1'}))[0];
+ if(!form||form.status!=='closed')bad(409,'Encerre a deliberação antes de gerar o relatório final.');
+ const submissions=await db('portal_form_submissions',{query:'select=ej_id,channel,state,answers,submitted_at,review_note&form_id=eq.'+formId+'&limit=1000'});
+ if(submissions.some(x=>x.state==='pending_review'))bad(409,'Existem respostas aguardando conferência. Analise-as antes de finalizar.');
+ const token=await googleToken(user);
+ const pref=(await db('prescon_preferences',{query:'select=private_root_folder_id&owner_user_id=eq.'+user.id+'&limit=1'}))[0];
+ if(!pref?.private_root_folder_id)bad(409,'Configure a pasta privada do Google Drive.');
+ const approved=submissions.filter(x=>x.state==='accepted');
+ const ejs=await db('ejs',{query:'select=id,name&limit=100'});
+ const counts={};
+ for(const row of approved)for(const [key,value] of Object.entries(row.answers||{})){
+  const v=typeof value==='string'?value:Array.isArray(value)?value.join(', '):JSON.stringify(value);
+  if(!counts[key])counts[key]={};counts[key][v]=(counts[key][v]||0)+1;
+ }
+ const lines=[
+  'NEJLON — RELATÓRIO FINAL DE DELIBERAÇÃO',
+  'Título: '+form.title,
+  'Tipo: '+(source.source_kind==='pf'?'Planejamento Financeiro':'Calendário'),
+  'Arquivo de origem: '+source.original_filename,
+  'Arquivo original no Drive: '+source.google_file_url,
+  'Prazo: '+(form.due_at||'Não informado'),
+  'Situação: encerrada',
+  'Gerado em: '+new Date().toISOString(),
+  '',
+  'CONSOLIDAÇÃO DE RESPOSTAS',
+  'Aceitas: '+approved.length,
+  'Aguardando conferência: '+submissions.filter(x=>x.state==='pending_review').length,
+  'Duplicadas: '+submissions.filter(x=>x.state==='duplicate').length,
+  'Rejeitadas: '+submissions.filter(x=>x.state==='rejected').length,
+  'Canal Google: '+submissions.filter(x=>x.channel==='google').length,
+  'Canal Portal: '+submissions.filter(x=>x.channel==='portal').length,
+  '',
+  'RESULTADOS POR QUESTÃO',
+  ...Object.entries(counts).flatMap(([key,values])=>[escapeReport(key),...Object.entries(values).map(([v,n])=>'  '+escapeReport(v)+': '+n)]),
+  '',
+  'RESPOSTAS ACEITAS POR EJ (CONFIDENCIAL — NÃO COMPARTILHAR SEM REVISÃO)',
+  ...approved.map(x=>(ejs.find(e=>e.id===x.ej_id)?.name||'EJ não identificada')+' · '+x.channel+' · '+Object.entries(x.answers||{}).map(([k,v])=>escapeReport(k)+': '+escapeReport(typeof v==='string'?v:JSON.stringify(v))).join(' | ')),
+  '',
+  'DECISÃO FINAL DA PRESCON',
+  decision,
+  '',
+  'FUNDAMENTAÇÃO, RESSALVAS E PROVIDÊNCIAS',
+  note,
+  '',
+  'Este documento foi gerado a partir dos registros aceitos no Portal. A PRESCON é responsável pela revisão e compartilhamento institucional.'
+ ];
+ const title='Relatório de deliberação — '+form.title;
+ const doc=await google('https://www.googleapis.com/drive/v3/files?fields=id,name',token,{method:'POST',data:{name:title.slice(0,240),
+  mimeType:'application/vnd.google-apps.document',parents:[pref.private_root_folder_id]}});
+ await google('https://docs.googleapis.com/v1/documents/'+encodeURIComponent(doc.id)+':batchUpdate',token,{method:'POST',data:{
+  requests:[{insertText:{endOfSegmentLocation:{},text:lines.join('\n').slice(0,150000)}}]
+ }});
+ const url='https://docs.google.com/document/d/'+doc.id+'/edit';
+ const saved=await db('prescon_deliberation_sources',{method:'PATCH',query:'form_id=eq.'+formId+'&owner_user_id=eq.'+user.id+'&status=eq.draft',
+  prefer:'return=representation',data:{status:'finalized',prescon_decision:decision,prescon_notes:note,
+   report_google_file_id:doc.id,report_google_url:url,report_generated_at:new Date().toISOString()}});
+ if(!saved.length)bad(409,'O relatório foi criado, mas o registro foi alterado durante a finalização. Verifique o Drive privado.');
+ await db('portal_workspace_artifacts',{method:'POST',data:{owner_user_id:user.id,artifact_key:'deliberation-'+formId,
+  source_type:'forms',source_id:formId,audience:'private',kind:'doc',google_file_id:doc.id,
+  google_folder_id:pref.private_root_folder_id,title,file_url:url,last_synced_at:new Date().toISOString()}});
+ return {ok:true,url,message:'Relatório final criado no Google Docs privado. A atualização do Painel depende da rotina Apps Script instalada.'};
+}
+
 Deno.serve(async req=>{
  const origin=req.headers.get('origin')||'';
  if(origin&&!ORIGINS.has(origin))return response(req,{error:'Origem não autorizada.'},403);
@@ -462,6 +587,7 @@ Deno.serve(async req=>{
    if(action==='dashboard')return response(req,await dashboard(user));
    if(action==='connect')return response(req,await authUrl(user));
    if(action==='apps_script_connections')return response(req,await appsScriptConnections(user));
+   if(action==='deliberation_sources')return response(req,await sourceList(user));
    if(action==='drive_list')return response(req,await driveList(user,url.searchParams));
    if(action==='sheet_read')return response(req,await sheetRead(user,url.searchParams));
    if(action==='doc_read')return response(req,await docRead(user,url.searchParams));
@@ -472,7 +598,8 @@ Deno.serve(async req=>{
   const p=await req.json();
   const ops={meeting_create:()=>createMeeting(user,p),task_create:()=>taskCreate(user,p),task_status:()=>taskStatus(user,p),
    demand_create:()=>demandCreate(user,p),decide:()=>decide(user,p),organize:()=>organize(user),export:()=>exportFile(user,p),sheet_save:()=>sheetSave(user,p),doc_save:()=>docSave(user,p),
-   apps_script_issue:()=>issueAppsScriptToken(user,p),apps_script_revoke:()=>revokeAppsScriptToken(user,p)};
+   apps_script_issue:()=>issueAppsScriptToken(user,p),apps_script_revoke:()=>revokeAppsScriptToken(user,p),
+   deliberation_create:()=>createDeliberationSource(user,p),deliberation_finalize:()=>finalizeDeliberation(user,p)};
   if(!ops[action])bad(404,'Ação não encontrada.');
   return response(req,await ops[action]());
  }catch(e){return response(req,{error:e instanceof ErrorHttp?e.message:'O servidor não conseguiu concluir a operação.'},e instanceof ErrorHttp?e.status:500)}
