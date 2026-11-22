@@ -600,8 +600,11 @@ Deno.serve(async req=>{
    bad(404,'Consulta não reconhecida.');
   }
   if(req.method!=='POST')bad(405,'Método não permitido.');
-  if(Number(req.headers.get('content-length')||0)>200000)bad(413,'Requisição muito grande.');
-  const p=await req.json();
+  const requestLimit=action==='deliberation_create'?Math.ceil(4*1024*1024*4/3)+8192:200000;
+  if(Number(req.headers.get('content-length')||0)>requestLimit)bad(413,'Requisição muito grande.');
+  const raw=await req.text();
+  if(raw.length>requestLimit)bad(413,'Requisição muito grande.');
+  let p;try{p=JSON.parse(raw)}catch{bad(400,'JSON inválido.');}
   const ops={meeting_create:()=>createMeeting(user,p),task_create:()=>taskCreate(user,p),task_status:()=>taskStatus(user,p),
    demand_create:()=>demandCreate(user,p),decide:()=>decide(user,p),organize:()=>organize(user),export:()=>exportFile(user,p),sheet_save:()=>sheetSave(user,p),doc_save:()=>docSave(user,p),
    apps_script_issue:()=>issueAppsScriptToken(user,p),apps_script_revoke:()=>revokeAppsScriptToken(user,p),
