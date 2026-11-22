@@ -351,9 +351,9 @@ async function revokeAppsScriptToken(user,body){
  return {ok:true,message:'Conexão revogada: o Apps Script não receberá novas atualizações.'};
 }
 async function appsScriptSnapshot(req){
- const h=req.headers.get('authorization')||'';
- if(!h.startsWith('Bearer ')||!APPS_SCRIPT_TOKEN.test(h.slice(7)))bad(401,'Conexão Apps Script inválida.');
- const tokenHash=await hash(h.slice(7));
+ const token=req.headers.get('x-prescon-sync-token')||'';
+ if(!APPS_SCRIPT_TOKEN.test(token))bad(401,'Conexão Apps Script inválida.');
+ const tokenHash=await hash(token);
  const records=await db('prescon_apps_script_tokens',{
   query:'select=id,owner_user_id,spreadsheet_id,expires_at,revoked_at&token_hash=eq.'+tokenHash+'&limit=1'
  });
