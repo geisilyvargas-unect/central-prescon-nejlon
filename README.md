@@ -25,3 +25,7 @@ A integração Google exige OAuth próprio no servidor, com consentimento da con
 ## Integração Apps Script
 
 A área [Apps Script](pages/apps-script.html) permite criar e revogar chaves de sincronização para a planilha já conhecida pelo Conselho. A rotina, executada em projeto privado na conta Google da PRESCON, atualiza somente a aba `PRESCON_AUTOMACOES`, sem enviar votos individuais ou justificativas. Para configurar, consulte [o guia completo](docs/APPS-SCRIPT.md). A criação do projeto Apps Script e o consentimento Google são ações do titular da conta; não foram automatizados pelo repositório.
+
+## Deliberações com documentos
+
+Acesse [Deliberações](pages/deliberacoes.html) para importar uma planilha de Planejamento Financeiro ou Calendário, criar um rascunho e, após encerrar a votação e revisar as respostas, gerar o relatório final privado no Google Docs. O Apps Script sincroniza os estados e links dos relatórios em uma aba separada do Painel Conselho 2026 após a instalação Google. [Escopo, segurança e limitações](docs/DELIBERACOES.md).
